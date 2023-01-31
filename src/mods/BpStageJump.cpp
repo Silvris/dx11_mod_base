@@ -2,6 +2,7 @@
 #include "BpStageJump.hpp"
 #include "PlayerTracker.hpp"
 #include <ctime>
+#include <random>
 
 uintptr_t BpStageJump::jmp_ret{NULL};
 uintptr_t BpStageJump::jmp_jne{NULL};
@@ -18,18 +19,37 @@ bool retrystage;
 bool randomizer;
 bool useseed = false;
 
-int seed = 0;
+std::string seed = "";
 
 bool randomStageToggle;
 int comboboxindex = 0;
 int BpStageJump::palace_type = BpStageJump::RANDOM;
 
+std::default_random_engine* randgen;
+
 // clang-format off
 // only in clang/icl mode on x64, sorry
 
+std::string BpStageJump::random_string(size_t length)
+{
+    auto randchar = []() -> char
+    {
+        const char charset[] =
+            "0123456789"
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+            "abcdefghijklmnopqrstuvwxyz";
+        const size_t max_index = (sizeof(charset) - 1);
+        return charset[rand() % max_index];
+    };
+    std::string str(length, 0);
+    std::generate_n(str.begin(), length, randchar);
+    return str;
+}
+
 int BpStageJump::random_generator(int low, int high)
 {
-	return low + (std::rand() % (high - low + 1));
+	std::uniform_int_distribution<int> gen(low,high)
+	return gen(randgen);
 }
 
 // random_generator(1,8), case switch to return a boss floor
@@ -113,9 +133,12 @@ void BpStageJump::randomize_array(int* array_param, int range_low, int range_hig
 }
 
 // Generate a new palace scenario
-void BpStageJump::generate_palace(int seed)
+void BpStageJump::generate_palace(std::string seed)
 {
 	reset_palace();
+
+	std::seed_seq seq(seed.begin(), seed.end());
+	randgen = new std::default_random_engine(seq);
 
 	switch (BpStageJump::palace_type) {
 	case palace_type_enum::PARTIAL:
@@ -271,8 +294,7 @@ std::optional<std::string> BpStageJump::on_initialize() {
   BpStageJump::jmp_jne = addr.value() + 8;
 
   // might as well randomize seed on boot
-  std::srand(std::time(0));
-  seed = std::rand();
+  seed = BpStageJump::random_string();
   generate_palace(seed);
 
   return Mod::on_initialize();
@@ -339,7 +361,7 @@ void BpStageJump::on_draw_ui() {
 
 		if (ImGui::Button("Randomize Palace")){
 			if (!useseed)
-				seed = std::rand();
+				seed = BpStageJump::random_string();
 			generate_palace(seed);
 		}
 		ImGui::TextWrapped("Co-op Random bloody palace: In order to use the randomizer in co-op mode, you and any co-op partners must use the same seed. "
@@ -347,7 +369,7 @@ void BpStageJump::on_draw_ui() {
 		"To use the seed, enter your seed into the \Palace Seed\" field, check the \"Use Custom Seed\" checkbox, then press \"Randomize Palace\" before starting.\n"
 		"Ensure everyone follows these instructions in the correct order before you start or your co-op session will NOT work.");
 		ImGui::Checkbox("Use Custom Seed", &useseed);
-		ImGui::InputInt("Palace Seed",&seed);
+		ImGui::InputText("Palace Seed",&seed);
     }
 	else {
 		ImGui::Spacing();

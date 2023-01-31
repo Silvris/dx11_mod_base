@@ -13,6 +13,7 @@ public:
   static bool altfloor;
   static enum palace_type_enum { BALANCED, PARTIAL, RANDOM };
   int static palace_type;
+  std::string static random_string(size_t length);
   int static random_generator(int low, int high);
   // random_generator(1,7), case switch to return a boss floor
   int static return_boss_floor();
